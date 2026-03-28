@@ -40,11 +40,12 @@ export default {
   async fetch(request) {
     // CORS プリフライト処理
     if (request.method === 'OPTIONS') {
+      const allowHeaders = request.headers.get('Access-Control-Request-Headers') || '';
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': '*',
+          'Access-Control-Allow-Headers': allowHeaders,
           'Access-Control-Max-Age': '86400',
         },
       });
@@ -57,7 +58,7 @@ export default {
       const corsHeaders = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Line-Channel-Access-Token',
       };
       
       return new Response(response.body, {
@@ -97,21 +98,24 @@ async function handleRequest(request) {
   // LINE API URL 構築
   const lineUrl = `${LINE_API_BASE}${url.pathname}`;
   
-  // リクエストボディを読み込み
-  let body = null;
+  // 転送用ヘッダーを構築 (元の Content-Type 等を保持)
+  const forwardHeaders = new Headers(request.headers);
+  // 認証ヘッダーを LINE 用に差し替え
+  forwardHeaders.set('Authorization', `Bearer ${channelAccessToken}`);
+  // プロキシ専用ヘッダーは転送しない
+  forwardHeaders.delete('X-Line-Channel-Access-Token');
+
+  // リクエストボディを読み込み (バイナリ対応)
+  let body;
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    body = await request.text();
+    body = await request.arrayBuffer();
   }
 
   // LINE API にリクエストを転送
   const lineResponse = await fetch(lineUrl, {
     method: request.method,
-    headers: {
-      'Authorization': `Bearer ${channelAccessToken}`,
-      'Content-Type': 'application/json',
-      'Content-Length': body ? new TextEncoder().encode(body).length : '0',
-    },
-    body: body || undefined,
+    headers: forwardHeaders,
+    body,
   });
 
   return lineResponse;
@@ -192,12 +196,12 @@ X-Line-Channel-Access-Token: {token}
 
 ---
 
-#### POST /richmenu/{richMenuId}/content
+#### GET /richmenu/{richMenuId}/content
 
 **リッチメニュー画像取得**
 
 ```http
-POST /richmenu/richmenu-1234567890abcdef/content
+GET /richmenu/richmenu-1234567890abcdef/content
 X-Line-Channel-Access-Token: {token}
 ```
 
@@ -393,16 +397,20 @@ impl LineApiClient {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RichMenuCreateRequest {
     pub size: RichMenuSize,
     pub selected: bool,
     pub name: String,
+    #[serde(rename = "chatBarText")]
     pub chat_bar_text: Option<String>,
     pub areas: Vec<RichMenuArea>,
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RichMenuCreateResponse {
+    #[serde(rename = "richMenuId")]
     pub rich_menu_id: String,
 }
 
@@ -451,7 +459,7 @@ impl From<reqwest::Error> for LineApiError {
 
 impl LineApiError {
     async fn from_response(response: reqwest::Response) -> Result<Self, reqwest::Error> {
-        let status = response.status();
+        let status = response.status().as_u16();
         let body: serde_json::Value = response.json().await?;
         
         let message = body.get("message").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string();

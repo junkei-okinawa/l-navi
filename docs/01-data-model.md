@@ -294,7 +294,7 @@ pub enum SimulationRole {
 
 ## 4. データアクセスパターン
 
-### 4.1 頻度由高
+### 4.1 頻度の高いパターン
 
 | パターン | 頻度 | ストア |
 |---|---|---|
@@ -347,9 +347,9 @@ const DB_VERSION: u32 = 1;
 ### 5.2 アップグレードハンドラー
 
 ```rust
-fn on_upgrade(db: &Database) -> Result<(), Error<String>> {
+fn on_upgrade(db: &Database, old_version: f64, new_version: f64) -> Result<(), Error<String>> {
     // バージョン 1: 初期スキーマ
-    if db.version() < 1.0 {
+    if old_version < 1.0 {
         db.build_object_store("api_keys")
             .key_path("id")
             .create()?;

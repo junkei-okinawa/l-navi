@@ -34,7 +34,7 @@ use crate::components::*;
 #[component]
 pub fn App() -> impl IntoView {
     // アプリケーション状態を作成
-    let app_state = create_resource(|| (), || async {
+    let app_state = create_resource(|| (), |_| async move {
         AppState::load().await
     });
 
@@ -160,7 +160,7 @@ pub fn ApiKeyManager() -> impl IntoView {
     let provider = create_rw_signal(Provider::Gemini);
     let api_key = create_rw_signal(String::new());
 
-    let save = move |ev: wasm_bindgen::JsCast| {
+    let save = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         // API キーを保存
     };
@@ -246,7 +246,7 @@ pub fn HearingChat(session_id: Option<String>) -> impl IntoView {
     );
 
     // メッセージを送信
-    let send_message = move |ev: wasm_bindgen::JsCast| {
+    let send_message = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
         
         let user_message = input.get().clone();
@@ -270,19 +270,56 @@ pub fn HearingChat(session_id: Option<String>) -> impl IntoView {
 
         // AI に質問を生成
         let session_id = session_id.get().clone();
+        let messages = messages;
+        let is_loading = is_loading;
         spawn_local(async move {
-            let llm_client = LlmClient::new().await;
-            let response = llm_client.generate_hearing_question(&session_id, &user_message).await;
-            
-            messages.update(|m| {
-                m.push(HearingMessage {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    session_id,
-                    role: MessageRole::Assistant,
-                    content: response,
-                    created_at: js_sys::Date::now() as i64,
-                });
-            });
+            // LLM クライアントを初期化（他ドキュメントと同様に Result を返す想定）
+            let llm_client = match LlmClient::new(provider, api_key).await {
+                Ok(client) => client,
+                Err(err) => {
+                    // 初期化エラー時のメッセージ追加
+                    messages.update(|m| {
+                        m.push(HearingMessage {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            session_id: session_id.clone(),
+                            role: MessageRole::Assistant,
+                            content: format!("LLM クライアントの初期化に失敗しました：{err}"),
+                            created_at: js_sys::Date::now() as i64,
+                        });
+                    });
+                    is_loading.set(false);
+                    return;
+                }
+            };
+
+            // 質問生成も Result を返す想定でハンドリング
+            match llm_client
+                .generate_hearing_question(&session_id, &user_message)
+                .await
+            {
+                Ok(content) => {
+                    messages.update(|m| {
+                        m.push(HearingMessage {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            session_id,
+                            role: MessageRole::Assistant,
+                            content,
+                            created_at: js_sys::Date::now() as i64,
+                        });
+                    });
+                }
+                Err(err) => {
+                    messages.update(|m| {
+                        m.push(HearingMessage {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            session_id,
+                            role: MessageRole::Assistant,
+                            content: format!("質問生成中にエラーが発生しました：{err}"),
+                            created_at: js_sys::Date::now() as i64,
+                        });
+                    });
+                }
+            }
             
             is_loading.set(false);
         });
@@ -477,24 +514,25 @@ use leptos::*;
 pub fn RichMenuPreview(rich_menu: RichMenu) -> impl IntoView {
     let scale = 0.5; // プレビュー縮小率
 
+    let rich_menu_size = rich_menu.size;
+    let rich_menu_name = rich_menu.name;
+    let rich_menu_areas = rich_menu.areas;
+
     view! {
         <div class="flex flex-col items-center">
             <div
                 class="border-2 border-gray-300 bg-gray-100"
-                style:format!("width: {}px; height: {}px;",
-                    rich_menu.size.width as f64 * scale,
-                    rich_menu.size.height as f64 * scale
-                )
+                style="width: {}px; height: {}px;" = ((rich_menu_size.width as f64 * scale) as i32, (rich_menu_size.height as f64 * scale) as i32)
             >
-                {move || rich_menu.areas.into_iter().map(|area| {
+                {move || rich_menu_areas.iter().map(|area| {
                     view! {
                         <div
                             class="absolute border border-blue-400 flex items-center justify-center cursor-pointer hover:bg-blue-100"
-                            style:format!("left: {}px; top: {}px; width: {}px; height: {}px;",
-                                area.bounds.x as f64 * scale,
-                                area.bounds.y as f64 * scale,
-                                area.bounds.width as f64 * scale,
-                                area.bounds.height as f64 * scale
+                            style="left: {}px; top: {}px; width: {}px; height: {}px;" = (
+                                (area.bounds.x as f64 * scale) as i32,
+                                (area.bounds.y as f64 * scale) as i32,
+                                (area.bounds.width as f64 * scale) as i32,
+                                (area.bounds.height as f64 * scale) as i32
                             )
                         >
                             {move || area.action.as_ref().map(|a| a.label.clone()).unwrap_or_default()}
@@ -503,7 +541,7 @@ pub fn RichMenuPreview(rich_menu: RichMenu) -> impl IntoView {
                 }).into_view()}
             </div>
             <p class="mt-2 text-sm text-gray-600">
-                {rich_menu.name}
+                {rich_menu_name}
             </p>
         </div>
     }

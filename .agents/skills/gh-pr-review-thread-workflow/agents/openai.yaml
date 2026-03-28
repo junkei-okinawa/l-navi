@@ -1,0 +1,4 @@
+interface:
+  display_name: 'GH PR Review Threads'
+  short_description: 'Handle PR review threads via gh api graphql'
+  default_prompt: 'Use -pr-review-thread-workflow to fetch PR review threads and reply/resolve them.'

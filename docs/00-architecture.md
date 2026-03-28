@@ -16,7 +16,7 @@ LINE 公式アカウントを AI エージェントと一緒に構築する Web 
 |---|---|
 | **ユーザー主権** | 全てのデータをクライアント側で管理。ユーザーがデータ削除可能 |
 | **クライアントファースト** | サーバー依存を最小化。Cloudflare Workers はプロキシのみ |
-| **安全なデフォルト** | API キーは localStorage 平文 (業界標準)。ユーザー教育で補完 |
+| **安全なデフォルト** | API キーは IndexedDB 平文。リスクを明告しユーザー教育で補完 |
 | **並列実装可能** | モジュール間でブロッキングを起こさない設計 |
 
 ---
@@ -107,9 +107,10 @@ LINE 公式アカウントを AI エージェントと一緒に構築する Web 
   │
   ├─(1) API キー入力画面でキーを入力
   │
-  ├─(2) localStorage に保存 (平文)
-  │     key: "llm_config"
-  │     value: { provider: "gemini", apiKey: "..." }
+  ├─(2) IndexedDB に保存 (平文)
+  │     store: "api_keys"
+  │     key: "default"
+  │     value: { provider: "Gemini", apiKey: "..." }
   │
   └─(3) アプリ起動時に読み込み、LLM クライアントに注入
 ```
@@ -129,7 +130,7 @@ LINE 公式アカウントを AI エージェントと一緒に構築する Web 
   ├─(4) AI が次の質問 OR 要件を確定
   │
   ├─(5) ヒストリーを indexed-db に保存
-  │     store: "hearing_history"
+  │     stores: "hearing_sessions", "hearing_messages"
   │
   └─(6) 要件確定後、LINE API 設定を生成
 ```
@@ -164,8 +165,8 @@ Leptos アプリ
 | 対策 | 実装 |
 |---|---|
 | **HTTPS 強制** | 必須。開発中は localhost 許容 |
-| **localStorage 利用** | 業界標準。XSS 対策で補完 |
-| **ユーザー教育** | 「ブラウザのプライベートデータと同じ扱い」と明告 |
+| **IndexedDB 利用** | localStorage より安全 (CORS 保護)。XSS 対策で補完 |
+| **ユーザー教育** | 「平文保存のため共有端末では使用しない」「ブラウザデータ削除で消去可能」と明告 |
 | **データ削除機能** | ユーザーが任意で API キー削除可能 |
 
 ### 5.2 LINE API キー保護
@@ -324,7 +325,7 @@ wrangler deploy
 | **Phase 8** | Cloudflare Workers | 1h |
 | **Phase 9** | 統合テスト | 2h |
 
-**合計：約 25h**
+**合計：約 27h**
 
 ---
 
