@@ -95,8 +95,8 @@ async function handleRequest(request) {
     throw new Error('Missing X-Line-Channel-Access-Token header');
   }
 
-  // LINE API URL 構築
-  const lineUrl = `${LINE_API_BASE}${url.pathname}`;
+  // LINE API URL 構築 (クエリ文字列も含める)
+  const lineUrl = `${LINE_API_BASE}${url.pathname}${url.search}`;
   
   // 転送用ヘッダーを構築 (元の Content-Type 等を保持)
   const forwardHeaders = new Headers(request.headers);
@@ -502,7 +502,8 @@ impl LineApiError {
 | ヘッダー | 必須 | 説明 |
 |---|---|---|
 | `X-Line-Channel-Access-Token` | はい | チャネルアクセストークン |
-| `Content-Type` | はい | `application/json` |
+| `Content-Type` (JSON API) | はい | `application/json` |
+| `Content-Type` (リッチメニュー画像アップロード) | はい | `image/jpeg` |
 
 ### 6.2 CORS 設定
 
@@ -510,7 +511,7 @@ impl LineApiError {
 // Worker で設定
 'Access-Control-Allow-Origin': '*',
 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-'Access-Control-Allow-Headers': '*',
+'Access-Control-Allow-Headers': 'Content-Type, X-Line-Channel-Access-Token',
 ```
 
 ---

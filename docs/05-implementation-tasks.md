@@ -277,7 +277,7 @@ pub struct LlmClient {
 }
 
 impl LlmClient {
-    pub async fn new(provider: Provider, api_key: String) -> Self;
+    pub async fn new(provider: Provider, api_key: String) -> Result<Self, LlmError>;
     pub async fn generate(&self, prompt: &str) -> Result<String, LlmError>;
     pub async fn generate_hearing_question(&self, session_id: &str, user_input: &str) -> Result<String, LlmError>;
 }

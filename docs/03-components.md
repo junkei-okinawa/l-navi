@@ -273,8 +273,39 @@ pub fn HearingChat(session_id: Option<String>) -> impl IntoView {
         let messages = messages;
         let is_loading = is_loading;
         spawn_local(async move {
-            // LLM クライアントを初期化（他ドキュメントと同様に Result を返す想定）
-            let llm_client = match LlmClient::new(provider, api_key).await {
+            // IndexedDB から設定を読み取る
+            let api_config = match load_api_key().await {
+                Ok(Some(config)) => config,
+                Ok(None) => {
+                    messages.update(|m| {
+                        m.push(HearingMessage {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            session_id: session_id.clone(),
+                            role: MessageRole::Assistant,
+                            content: "API キーが設定されていません。設定ページから API キーを入力してください。".to_string(),
+                            created_at: js_sys::Date::now() as i64,
+                        });
+                    });
+                    is_loading.set(false);
+                    return;
+                }
+                Err(err) => {
+                    messages.update(|m| {
+                        m.push(HearingMessage {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            session_id: session_id.clone(),
+                            role: MessageRole::Assistant,
+                            content: format!("設定の読み込みに失敗しました：{err}"),
+                            created_at: js_sys::Date::now() as i64,
+                        });
+                    });
+                    is_loading.set(false);
+                    return;
+                }
+            };
+
+            // LLM クライアントを初期化（Result を返す想定）
+            let llm_client = match LlmClient::new(api_config.provider, api_config.api_key).await {
                 Ok(client) => client,
                 Err(err) => {
                     // 初期化エラー時のメッセージ追加
@@ -333,11 +364,14 @@ pub fn HearingChat(session_id: Option<String>) -> impl IntoView {
                     {move || messages.get().into_iter().map(|msg| {
                         view! {
                             <div class={if msg.role == MessageRole::User { "ml-auto" } else { "mr-auto" }}>
-                                <div class={if msg.role == MessageRole::User {
-                                    "bg-blue-600 text-white"
-                                } else {
-                                    "bg-gray-200 text-gray-900"
-                                } " rounded-lg px-4 py-2 max-w-lg"}>
+                                <div class={format!(
+                                    "{} rounded-lg px-4 py-2 max-w-lg",
+                                    if msg.role == MessageRole::User {
+                                        "bg-blue-600 text-white"
+                                    } else {
+                                        "bg-gray-200 text-gray-900"
+                                    }
+                                )}>
                                     {msg.content}
                                 </div>
                             </div>

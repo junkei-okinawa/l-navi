@@ -141,7 +141,7 @@ LINE 公式アカウントを AI エージェントと一緒に構築する Web 
 Leptos アプリ
   │
   ├─(1) LINE API 呼び出しリクエスト
-  │     POST /richmenu/create
+  │     POST /richmenu
   │     Body: { richmenudata: {...} }
   │
   ├─(2) Cloudflare Workers に転送
@@ -165,7 +165,7 @@ Leptos アプリ
 | 対策 | 実装 |
 |---|---|
 | **HTTPS 強制** | 必須。開発中は localhost 許容 |
-| **IndexedDB 利用** | localStorage より安全 (CORS 保護)。XSS 対策で補完 |
+| **IndexedDB 利用** | localStorage と同様に同一オリジンポリシーに依存しつつ、API 仕様上キー用途に適したストレージとして利用。XSS 対策で補完 |
 | **ユーザー教育** | 「平文保存のため共有端末では使用しない」「ブラウザデータ削除で消去可能」と明告 |
 | **データ削除機能** | ユーザーが任意で API キー削除可能 |
 
