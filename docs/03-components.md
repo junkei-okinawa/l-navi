@@ -196,7 +196,7 @@ pub fn ApiKeyManager() -> impl IntoView {
                             placeholder="sk-..."
                         />
                         <p class="mt-1 text-sm text-gray-500">
-                            API キーはブラウザに安全に保存されます。
+                            API キーは IndexedDB に平文で保存されます。
                         </p>
                     </div>
 
@@ -211,8 +211,8 @@ pub fn ApiKeyManager() -> impl IntoView {
                 <div class="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                     <h3 class="text-sm font-medium text-yellow-800 mb-2">セキュリティについて</h3>
                     <p class="text-sm text-yellow-700">
-                        API キーはブラウザの localStorage に保存されます。これは業界標準の手法です。
-                        ブラウザのプライベートデータと同じ扱いとしてください。
+                        API キーはブラウザの IndexedDB（api_keys ストア）に平文で保存されます。
+                        共有端末での使用を避け、必要に応じてブラウザデータの削除で消去できます。
                     </p>
                 </div>
             </div>
@@ -556,18 +556,17 @@ pub fn RichMenuPreview(rich_menu: RichMenu) -> impl IntoView {
         <div class="flex flex-col items-center">
             <div
                 class="border-2 border-gray-300 bg-gray-100"
-                style="width: {}px; height: {}px;" = ((rich_menu_size.width as f64 * scale) as i32, (rich_menu_size.height as f64 * scale) as i32)
+                style:width=move || format!("{}px", (rich_menu_size.width as f64 * scale) as i32)
+                style:height=move || format!("{}px", (rich_menu_size.height as f64 * scale) as i32)
             >
                 {move || rich_menu_areas.iter().map(|area| {
                     view! {
                         <div
                             class="absolute border border-blue-400 flex items-center justify-center cursor-pointer hover:bg-blue-100"
-                            style="left: {}px; top: {}px; width: {}px; height: {}px;" = (
-                                (area.bounds.x as f64 * scale) as i32,
-                                (area.bounds.y as f64 * scale) as i32,
-                                (area.bounds.width as f64 * scale) as i32,
-                                (area.bounds.height as f64 * scale) as i32
-                            )
+                            style:left=move || format!("{}px", (area.bounds.x as f64 * scale) as i32)
+                            style:top=move || format!("{}px", (area.bounds.y as f64 * scale) as i32)
+                            style:width=move || format!("{}px", (area.bounds.width as f64 * scale) as i32)
+                            style:height=move || format!("{}px", (area.bounds.height as f64 * scale) as i32)
                         >
                             {move || area.action.as_ref().map(|a| a.label.clone()).unwrap_or_default()}
                         </div>
